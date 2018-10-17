@@ -1,0 +1,64 @@
+---
+title: "Escapement Goals Evaluation"
+author: "Jeanette Clark"
+date: "10/17/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Prepare Daily Escapement Data
+
+Daily data sourced from [Alaska Department of Fish and Game. 2017. Daily salmon escapement counts from the OceanAK database, Alaska, 1921-2017. Knowledge Network for Biocomplexity. doi:10.5063/F1TX3CKH](http://doi.org/10.5063/F1TX3CKH)
+
++ filter for Bristol Bay Sockeye
++ summarize by year, calculaing total count
+
+```{r}
+esc <- read.csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/urn%3Auuid%3Af119a05b-bbe7-4aea-93c6-85434dcb1c5e", stringsAsFactors = F)
+
+head(esc)
+```
+
+
+```{r}
+esc_clean <- esc %>%
+  filter(SASAP.Region == "Bristol Bay" & Species == "Sockeye") %>% 
+  select(Location, SASAP.Region, Species, sampleDate, DailyCount) %>% 
+  separate(sampleDate, c("Year", "Month", "Day")) %>% 
+  group_by(Location, Year) %>% 
+  summarise(annual_count = sum(DailyCount))
+
+head(esc_clean)
+```
+
+# Prepare Escapement Goals Data
+
+
+```{r}
+goals <- read.csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/knb.92014.1", stringsAsFactors = F)
+
+head(goals)
+```
+
+```{r}
+goals_clean <- goals %>%
+  select(Species, Region, System, Lower, Upper, Type, Initial.Year) %>% 
+  filter(Region == "Bristol Bay" & Species == "Sockeye") %>% 
+  mutate(Lower = as.numeric(Lower), Initial.Year = as.numeric(Initial.Year))
+
+head(goals_clean)
+
+```
+
+# Evaluate Escapement Goals
+
+```{r}
+goals_joined <- left_join(esc_clean, goals_clean, by = c("Location" = "System")) %>% 
+  mutate(goal_met = ifelse(annual_count > Lower & annual_count < Upper, TRUE, FALSE)) %>% 
+  select(-Species, -Region)
+
+head(goals_joined)
+```
